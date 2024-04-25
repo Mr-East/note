@@ -2,8 +2,6 @@
 
 
 
-
-
 # Shell 
 
 ## 变量
@@ -22,6 +20,8 @@ ${a}th 和 $ath
 
 **多元运算符**
 
-![image-20240415143216978](/Users/apple/Library/Application Support/typora-user-images/image-20240415143216978.png)
 
-![image-20240415144324444](/Users/apple/Library/Application Support/typora-user-images/image-20240415144324444.png)
+![Shell/IMG_20240425-152006658](images/1962a89b66c86da58fbc9f79cb6dfb32ec496f5db77bc86aa45541ab721f54a3.png)  
+
+![Shell/IMG_20240425-152102022](images/1962a89b66c86da58fbc9f79cb6dfb32ec496f5db77bc86aa45541ab721f54a3.png)  
+
