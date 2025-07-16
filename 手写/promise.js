@@ -26,7 +26,11 @@ class myPromise {
             }
 
         }
-        func(resolve, reject)
+        try {
+            func(resolve, reject)
+        } catch (error) {
+            reject(error)
+        }
     }
 
     then(onFulFilled, onRejected) {
@@ -35,25 +39,65 @@ class myPromise {
 
         const p2 = new myPromise((resolve, reject) => {
             if (this.state === FULFILLED) {
-                this.runAsyncTask(() => onFulFilled(this.resulte))
+                this.runAsyncTask(() => {
+                    try {
+                        const x = onFulFilled(this.resulte)
+                        resolvePromise(p2, x, resolve, reject)
+                    } catch (error) {
+                        reject(error)
+                    }
+                })
 
             } else if (this.state === REJECTED) {
-                this.runAsyncTask(() => onRejected(this.resulte))
+                this.runAsyncTask(() => {
+                    try {
+                        const x = onRejected(this.resulte)
+                        resolvePromise(p2, x, resolve, reject)
+                    } catch (error) {
+                        reject(error)
+                    }
+
+                }
+                )
 
             } else if (this.state === PENDING) {
 
                 this.#handlers.push({
                     onFulFilled: () => {
-                        this.runAsyncTask(() => onFulFilled(this.resulte))
+                        this.runAsyncTask(() => {
+                            try {
+                                const x = onFulFilled(this.resulte)
+                                resolvePromise(p2, x, resolve, reject)
+                            } catch (error) {
+                                reject(error)
+                            }
+
+                        })
                     },
                     onRejected: () => {
-                        this.runAsyncTask(() => onRejected(this.resulte))
+                        this.runAsyncTask(() => {
+                            try {
+                                const x = onRejected(this.resulte)
+                                resolvePromise(p2, x, resolve, reject)
+                            } catch (error) {
+                                reject(error)
+                            }
+
+                        })
                     }
                 })
 
             }
         })
         return p2
+    }
+
+    catch(onRejected) {
+        return this.then(undefined, onRejected)
+    }
+
+    finally(onFinally) {
+        return this.then(onFinally, onFinally)
     }
     //异步任务
     runAsyncTask(callback) {
@@ -69,28 +113,58 @@ class myPromise {
             setTimeout(callback, 0)
         }
     }
+
+    static resolve(value) {
+        if (value instanceof myPromise) {
+            return value
+        }
+        return new myPromise((resolve, reject) => {
+            resolve(value)
+        })
+    }
+
+    static race(promises) {
+
+        return new myPromise((resovle, reject) => {
+            // 类型检查
+            if (!Array.isArray(promises)) {
+                return reject(new TypeError("Arugment is not iterable"))
+            }
+            promises.forEach(p => {
+                myPromise.resolve(p).then((res) => resovle(res), err => reject(err))
+            })
+
+
+        })
+    }
 }
 
+// 逻辑抽离
+function resolvePromise(p2, x, resolve, reject) {
+    if (x === p2) {
+        throw new TypeError('重复引用')
+    }
+    //如果返回的是Promise实例，需要在用then方法获取res再进行resolve或者reject
+    if (x instanceof myPromise) {
+        x.then(res => resolve(res), error => reject(error))
+    } else {
+        resolve(x)
+    }
+}
 
-
-console.log('top');
-
-const p = new myPromise((resovle, reject) => {
+// 测试代码
+const p1 = new myPromise((resolve, reject) => {
     setTimeout(() => {
-        resovle('success')
-    }, 2000);
+        resolve(1)
+    }, 2000)
+
 })
 
-p.then(res => {
-    console.log('then1', res)
-}, res => {
-    console.log('then1', res);
-}
-)
-p.then(res => {
-    console.log('then2', res)
-}, res => {
-    console.log('then2', res);
-}
-)
-console.log('bottom');
+const p2 = new myPromise((resolve, reject) => {
+    setTimeout(() => {
+        resolve(12)
+    }, 1000)
+})
+
+
+myPromise.race([p1, p2]).then(res => console.log(res), err => console.log(err));
