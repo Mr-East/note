@@ -38,5 +38,5 @@ function deepCopy(source, storage = new WeakMap()) {
             res[key] = typeof source[key] === 'object' ? deepCopy(source[key],storage):source[key]
         }
     }
-
+    return res
 }

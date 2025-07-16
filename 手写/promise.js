@@ -1,96 +1,132 @@
-
 const PENDING = 'pending'
 const FULFILLED = 'fulfilled'
-const REJECTED = 'rejected'
-class myPromise {
-    resulte = undefined
-    state = PENDING
+const REJECT = 'reject'
+class MyPromise {
+    #state = PENDING
+    #result = undefined
     #handlers = []
-    constructor(func) {
-        const resolve = (resulte) => {
-            if (this.state === PENDING) {
-                this.state = FULFILLED
-                this.resulte = resulte
-                this.#handlers.forEach(({ onFulFilled }) => {
-                    onFulFilled(this.resulte)
-                })
-            }
+    constructor(executor) {
+        this.#result = undefined
+        this.#state = PENDING
+        this.#handlers = []
+        try {
+            executor(this.resolve.bind(this), this.reject.bind(this))
+        } catch (error) {
+            this.reject(error)
         }
-        const reject = (resulte) => {
-            if (this.state === PENDING) {
-                this.state = REJECTED
-                this.resulte = resulte
-                this.#handlers.forEach(({ onRejected }) => {
-                    onRejected(this.resulte)
-                })
-            }
-
-        }
-        func(resolve, reject)
     }
 
-    then(onFulFilled, onRejected) {
-        onFulFilled = typeof onFulFilled === 'function' ? onFulFilled : x => x
-        onRejected = typeof onRejected === 'function' ? onRejected : x => { throw x }
 
-        const p2 = new myPromise((resolve, reject) => {
-            if (this.state === FULFILLED) {
-                this.runAsyncTask(() => onFulFilled(this.resulte))
 
-            } else if (this.state === REJECTED) {
-                this.runAsyncTask(() => onRejected(this.resulte))
+    //改变状态时触发的回调函数
+    #changeState(state, result) {
+        if (this.#state !== PENDING) return;
+        this.#state = state
+        this.#result = result
+        this.#run()
+    }
+    //run方法中执行逻辑封装
+    #runOne(callback, resolve, reject) {
 
-            } else if (this.state === PENDING) {
-
-                this.#handlers.push({
-                    onFulFilled: () => {
-                        this.runAsyncTask(() => onFulFilled(this.resulte))
-                    },
-                    onRejected: () => {
-                        this.runAsyncTask(() => onRejected(this.resulte))
+        const settled = this.#result === FULFILLED ? resolve : reject;
+        // 微队列处理
+        this.#runMicronTask(() => {
+            // 传进来的callback不是函数
+            if (typeof callback !== 'function') {
+                settled(callback)
+                return
+            } else {
+                //是函数
+                try {
+                    const data = callback(this.#result)
+                    //返回的对象是Promise
+                    if (this.#isPromiseLike(data)) {
+                        data.then(resolve, reject)
+                    } else {
+                        resolve(data)
                     }
-                })
-
+                } catch (error) {
+                    reject(error)
+                }
             }
         })
-        return p2
-    }
-    //异步任务
-    runAsyncTask(callback) {
-        if (typeof queueMicrotask === 'function') {
-            queueMicrotask(callback)
-        } else if (typeof MutationObserver === 'function') {
-            const obs = new MutationObserver(callback)
-            const div = document.createElement('div')
-            obs.observe(div, { childList: true })
-            div.innerHTML = 'asyncTask'
 
+    }
+    // 执行函数
+    #run() {
+        if (this.#state === PENDING) return
+        while (this.#handlers.length) {
+            const { resolve, reject, onFulFilled, onReject } = this.#handlers.shift()
+            if (this.#state === FULFILLED) {
+                this.#runOne(onFulFilled, resolve, reject)
+            } else {
+                this.#runOne(onReject, resolve, reject)
+            }
+
+        }
+    }
+
+    resolve(data) {
+        this.#changeState(FULFILLED, data)
+    }
+    reject(reason) {
+        this.#changeState(REJECT, reason)
+    }
+
+    //then方法
+    then(onFulFilled, onReject) {
+        return new MyPromise((resolve, reject) => {
+            this.#handlers.push({
+                resolve,
+                reject,
+                onReject,
+                onFulFilled,
+            })
+            this.#run()
+        })
+
+    }
+    
+    // PromiseLike判断函数
+    #isPromiseLike(value) {
+        //值不为空，为带有then方法的对象或者函数，则认定为Promise
+        if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
+            return typeof value.then === 'function'
         } else {
-            setTimeout(callback, 0)
+            return false
+        }
+
+    }
+
+    // 执行微队列任务
+    #runMicronTask(func) {
+        // Node环境实现微队列
+        if (typeof process === 'object' && typeof process.nextTick === 'function') {
+            process.nextTick(func)
+        }
+        // 浏览器环境实现微队列
+        else if (typeof MutationObserver === 'function') {
+            const ob = new MutationObserver(func)
+            const textNode = document.createTextNode('1');
+            ob.observe(textNode, {
+                characterData: true
+            });
+            textNode.data = '2'
+        } else {
+            setTimeout(func, 0)
         }
     }
 }
 
-
-
-console.log('top');
-
-const p = new myPromise((resovle, reject) => {
+const p = new MyPromise((resolve, reject) => {
     setTimeout(() => {
-        resovle('success')
-    }, 2000);
+        resolve(123)
+    }, 1000)
 })
 
-p.then(res => {
-    console.log('then1', res)
-}, res => {
-    console.log('then1', res);
-}
-)
-p.then(res => {
-    console.log('then2', res)
-}, res => {
-    console.log('then2', res);
-}
-)
-console.log('bottom');
+p.then((res) => {
+    console.log(res), (err) => {
+        console.log(err);
+
+    };
+})
